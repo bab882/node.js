@@ -1,151 +1,167 @@
-const User = require('../model/user');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const jwtsecret = 'ddhqgkferiokbdtzaz';
+const User = require("../model/User");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
-exports.register = async (req, res, next) => { // Création d'un nouvel utilisateur
-    const {username, password} = req.body; // Récupération des données du formulaire
-    if(password.length < 6) { // Vérification de la longueur du mot de passe
-        return res.status(400).json({ // Si le mot de passe est inférieur à 6 caractères, on renvoie une erreur
-            message: 'Le mot de passe doit contenir au moins 6 caractères.'
-        }); // On renvoie une erreur
-    }
-    bcrypt.hash(password, 10).then(async (hash) => { // On hash le mot de passe
-        await User.create({ // On crée l'utilisateur
-            username, 
-            password:hash // On stocke le hash du mot de passe
-        })
-        .then((User) => { // Si l'utilisateur est créé avec succès
-            const maxAge = 3*60*60; // Durée de vie du token
-            const token = jwt.signing({id: User._id, username, role: User.role}, jwtsecret, {expiresIn: maxAge}); // Création du token
-            res.cookie('jwt', token, {httpOnly: true, maxAge: maxAge*1000}); // On stocke le token dans un cookie
-            res.status(201).json({ // On renvoie un message de succès
-                message: 'Utilisateur créé avec succès.', // Message de succès
-                user: User._id, role: User.role, // On renvoie l'id de l'utilisateur et son rôle
-            });
-        })
-        .catch((error) => { // Si l'utilisateur n'a pas pu être créé
-            res.status(400).json({ // On renvoie une erreur
-                message: 'L\'utilisateur existe déjà.', // Message d'erreur
-                error: error.message, // Message d'erreur
-            })
+const jwtSecret = "4715aed3c946f7b0a38e6b534a9583628d84e96d10fbc04700770d572af3dce43625dd";
+exports.register = async (req, res, next) => {
+  const { username, password } = req.body;
+  if (password.length < 6) {
+    return res.status(400).json({ message: "Password less than 6 characters" });
+  }
+  bcrypt.hash(password, 10).then(async (hash) => {
+    await User.create({
+      username,
+      password: hash,
+    })
+      .then((user) => {
+        const maxAge = 3 * 60 * 60;
+        const token = jwt.sign(
+          { id: user._id, username, role: user.role },
+          jwtSecret,
+          {
+            expiresIn: maxAge, // 3hrs
+          }
+        );
+        res.cookie("jwt", token, {
+          httpOnly: true,
+          maxAge: maxAge * 1000,
         });
-    });
-};
-exports.login = async (req, res, next) => { // Connexion d'un utilisateur
-    const {username, password} = req.body; // Récupération des données du formulaire
-    if(!username || !password) { // Vérification des données du formulaire
-        res.status(400).json({ // Si le formulaire est incomplet, on renvoie une erreur
-            message: 'Veuillez remplir tous les champs.'
+        res.status(201).json({
+          message: "User successfully created",
+          user: user._id,
+          role: user.role,
         });
-    }
-    try { // On essaie de trouver l'utilisateur dans la base de données
-        const user = await User.findOne({username}); // Requete SQL pour rechercher l'utilisateur dans la base de données
-        if(!user){ // Si l'utilisateur n'existe pas
-            res.status(400).json({ // On renvoie une erreur
-                message: 'L\'utilisateur n\'a pas été trouvé.', // Message d'erreur
-                error: error.message, // Message d'erreur
-            });
-        } else {
-            bcrypt.compare(password, user.password).then(function (result) { // On compare le mot de passe entré avec le hash stocké dans la base de données))
-                if(result) { // Si le mot de passe est correct
-                    const maxAge = 3*60*60; // Durée de vie du token
-                    const token = jwt.signing({id: user._id, username, role: user.role}, jwtsecret, {expiresIn: maxAge}); // Création du token
-                } else {
-                    res.status(400).json({ // Si le mot de passe est incorrect
-                        message: 'Votre identifiant ou votre mot de passe est incorrect.', // Message d'erreur
-                        error: error.message, // Message d'erreur
-                    });
-                }
-            });
-        }
-    } catch(err){ // Si l'utilisateur n'a pas pu être trouvé
-        res.status(400).json({ // Si l'utilisateur n'a pas pu être trouvé
-            message: 'Une erreur est survenue.', // Message d'erreur
-            error: err.message, // Message d'erreur
-        });
-    }
-};
-exports.update = async (req, res, next) => { // Modification d'un utilisateur
-    const {id, role} = req.body; // Récupération des données du formulaire
-    if(role && id){ // Vérification des données du formulaire
-        if(role === 'admin'){ // Si le rôle est admin
-            await User.findById(id) // Requete SQL pour rechercher l'utilisateur dans la base de données
-                .then((user) => { // Si l'utilisateur est trouvé)
-                    if(user.role !== 'admin'){ // Si l'utilisateur n'est pas déjà admin
-                        user.role = role; // On modifie le rôle de l'utilisateur
-                        user.save((err) => {
-                            if(err) {
-                                res.status(400).json({ // Si l'utilisateur n'a pas pu être modifié
-                                    message: 'Une erreur est survenue.', // Message d'erreur
-                                    error: err.message, // Message d'erreur
-                                });
-                            } else {
-                                res.status(200).json({ // On renvoie un message de succès
-                                    message: `Utilisateur ${user} modifié avec succès.`, // Message de succès
-                                    user, // On renvoie l'id de l'utilisateur
-                                });
-                            }
-                        }); // On sauvegarde les modifications
-                    }
-                })
-                .catch((error) => { // Si l'utilisateur n'a pas pu être trouvé
-                    res.status(400).json({ // On renvoie une erreur
-                        message: 'Une erreur est survenue.', // Message d'erreur
-                        error: error.message, // Message d'erreur
-                    })
-                });
-        }
-    }
-};
-exports.delete = async (req, res, next) => { // Suppression d'un utilisateur
-    const {id} = req.body; // Récupération de l'id de l'utilisateur
-    await User.findById(id) // Requete SQL pour supprimer l'utilisateur
-        .then((user) => {
-            user.remove();
-            res.status(200).json({ // On renvoie un message de succès
-                message: `Utilisateur ${user} supprimé avec succès.`, // Message de succès
-                user, // On renvoie l'id de l'utilisateur
-            });
-        })
-        .catch((error) => { // Si l'utilisateur n'a pas pu être supprimé
-            res.status(400).json({ // On renvoie une erreur
-                message: 'Une erreur est survenue.', // Message d'erreur
-                error: error.message, // Message d'erreur
-            })
-        });
-
-    /*
-    const {id} = req.body; // Récupération de l'id de l'utilisateur
-    await User.findByIdAndDelete(id) // Requete SQL pour supprimer l'utilisateur
-        .then((user) => { // Si l'utilisateur est supprimé avec succès
-            res.status(200).json({ // On renvoie un message de succès
-                message: 'Utilisateur supprimé avec succès.', // Message de succès
-                user: user._id, // On renvoie l'id de l'utilisateur
-            });
-        })
-        .catch((error) => { // Si l'utilisateur n'a pas pu être supprimé
-            res.status(400).json({ // On renvoie une erreur
-                message: 'Une erreur est survenue.', // Message d'erreur
-                error: error.message, // Message d'erreur
-            })
-        });
-    */
-};
-exports.getUsers = async (req, res, next) => { // Récupération de tous les utilisateurs
-    await User.find({}) // Requete SQL pour récupérer tous les utilisateurs
-      .then((users) => {   // Si la requete est un succès
-        const userFunction = users.map((user) => { // On map les utilisateurs
-          const container = {}; // On crée un objet vide
-          container.username = user.username; // On ajoute les données de l'utilisateur dans l'objet
-          container.role = user.role; // On ajoute les données de l'utilisateur dans l'objet
-          container.id = user._id; // On ajoute les données de l'utilisateur dans l'objet
-  
-          return container; // On renvoie l'objet
-        });
-        res.status(200).json({ user: userFunction }); // On renvoie les utilisateurs
       })
-      .catch((err) => // Si la requete n'est pas un succès
-        res.status(401).json({ message: "Not successful", error: err.message }) // On renvoie une erreur
+      .catch((error) =>
+        res.status(400).json({
+          message: "User not successful created",
+          error: error.message,
+        })
       );
-  };
+  });
+};
+
+exports.login = async (req, res, next) => {
+  const { username, password } = req.body;
+
+  // Check if username and password is provided
+  if (!username || !password) {
+    return res.status(400).json({
+      message: "Username or Password not present",
+    });
+  }
+
+  try {
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      res.status(400).json({
+        message: "Login not successful",
+        error: "User not found",
+      });
+    } else {
+      // comparing given password with hashed password
+      bcrypt.compare(password, user.password).then(function (result) {
+        if (result) {
+          const maxAge = 3 * 60 * 60;
+          const token = jwt.sign(
+            { id: user._id, username, role: user.role },
+            jwtSecret,
+            {
+              expiresIn: maxAge, // 3hrs in sec
+            }
+          );
+          res.cookie("jwt", token, {
+            httpOnly: true,
+            maxAge: maxAge * 1000, // 3hrs in ms
+          });
+          res.status(201).json({
+            message: "User successfully Logged in",
+            user: user._id,
+            role: user.role,
+          });
+        } else {
+          res.status(400).json({ message: "Login not succesful" });
+        }
+      });
+    }
+  } catch (error) {
+    res.status(400).json({
+      message: "An error occurred",
+      error: error.message,
+    });
+  }
+};
+
+exports.update = async (req, res, next) => {
+  const { role, id } = req.body;
+  // Verifying if role and id is presnt
+  if (role && id) {
+    // Verifying if the value of role is admin
+    if (role === "admin") {
+      // Finds the user with the id
+      await User.findById(id)
+        .then((user) => {
+          // Verifies the user is not an admin
+          if (user.role !== "admin") {
+            user.role = role;
+            user.save((err) => {
+              //Monogodb error checker
+              if (err) {
+                return res
+                  .status("400")
+                  .json({ message: "An error occurred", error: err.message });
+                process.exit(1);
+              }
+              res.status("201").json({ message: "Update successful", user });
+            });
+          } else {
+            res.status(400).json({ message: "User is already an Admin" });
+          }
+        })
+        .catch((error) => {
+          res
+            .status(400)
+            .json({ message: "An error occurred", error: error.message });
+        });
+    } else {
+      res.status(400).json({
+        message: "Role is not admin",
+      });
+    }
+  } else {
+    res.status(400).json({ message: "Role or Id not present" });
+  }
+};
+
+exports.deleteUser = async (req, res, next) => {
+  const { id } = req.body;
+  await User.findById(id)
+    .then((user) => user.remove())
+    .then((user) =>
+      res.status(201).json({ message: "User successfully deleted", user })
+    )
+    .catch((error) =>
+      res
+        .status(400)
+        .json({ message: "An error occurred", error: error.message })
+    );
+};
+
+exports.getUsers = async (req, res, next) => {
+  await User.find({})
+    .then((users) => {
+      const userFunction = users.map((user) => {
+        const container = {};
+        container.username = user.username;
+        container.role = user.role;
+        container.id = user._id;
+
+        return container;
+      });
+      res.status(200).json({ user: userFunction });
+    })
+    .catch((err) =>
+      res.status(401).json({ message: "Not successful", error: err.message })
+    );
+};

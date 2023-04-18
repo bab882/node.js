@@ -1,31 +1,37 @@
-const express = require('express');
-const cookieParser = require('cookie-parser');
+const express = require("express");
+const connectDB = require("./db");
 const app = express();
-const connectDB = require('./db');
-const { adminAuth, userAuth } = require('./middleware/auth');
+const cookieParser = require("cookie-parser");
+const { adminAuth, userAuth } = require("./middleware/auth.js");
+
+const PORT = 5000;
 
 connectDB();
 
-app.set('view engine', 'ejs');
+app.set("view engine", "ejs");
+
 app.use(express.json());
 app.use(cookieParser());
 
-app.get('/', (req, res) => res.render('home'));
-app.get('/', (req, res) => res.render('register'));
-app.get('/', (req, res) => res.render('login'));
-app.get('/', (req, res) => { 
-    res.cookie('jwt', '', { maxAge: 1 });
-    res.redirect('/');
+// Routes
+app.use("/api/auth", require("./Auth/route"));
+
+app.get("/", (req, res) => res.render("home"));
+app.get("/register", (req, res) => res.render("register"));
+app.get("/login", (req, res) => res.render("login"));
+app.get("/logout", (req, res) => {
+  res.cookie("jwt", "", { maxAge: "1" });
+  res.redirect("/");
 });
 
-app.get('/admin', adminAuth, (req, res) => res.render('admin'));
-app.get('/compte', userAuth, (req, res) => res.render('user'));
+app.get("/admin", adminAuth, (req, res) => res.render("admin"));
+app.get("/basic", userAuth, (req, res) => res.render("user"));
 
-app.listen(8080, () => {
-    console.log('Listening on port 8080');
-});
+const server = app.listen(PORT, () =>
+  console.log(`Server Connected to port ${PORT}`)
+);
 
 process.on("unhandledRejection", (err) => {
-    console.log(`Error: ${err.message}`);
-    Server.close(() => process.exit(1));
+  console.log(`An error occurred: ${err.message}`);
+  server.close(() => process.exit(1));
 });

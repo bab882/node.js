@@ -1,6 +1,5 @@
 const Mongoose = require('mongoose');
-
-const localDB = "mongodb://127.0.0.27017/roleAuth";
+const localDB = "mongodb://127.0.0.1:27017/roleAuth";
 
 const connectDB = async () => {
     try {
@@ -9,7 +8,7 @@ const connectDB = async () => {
             useUnifiedTopology: true,
         });
         console.log('MongoDB Connected');
-    } catch (err){
+    } catch (err) {
         console.error(err.message);
         process.exit(1);
     }
